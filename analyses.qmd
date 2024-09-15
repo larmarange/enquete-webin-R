@@ -11,6 +11,7 @@ format:
   html:
     code-fold: true
     dpi: 300
+    embed-resources: true
 editor: visual
 ---
 
