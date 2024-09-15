@@ -1,0 +1,226 @@
+---
+title: "Analyse enquête webin-R"
+description: "Enquête réalisée entre le 17 mai et le 10 juin 2021 auprès des personnes inscrites sur la liste de diffusion des webin-R"
+author:
+  - name: Joseph Larmarange
+    orcid: 0000-0001-7097-700X
+    url: https://joseph.larmarange.net
+    affiliations: IRD, Ceped
+lang: fr
+format:
+  html:
+    code-fold: true
+    dpi: 300
+editor: visual
+---
+
+## Import et préparation des données
+
+```{r}
+#| message: false
+
+# chargement des packages
+library(tidyverse)
+library(readxl)
+library(labelled)
+library(gtsummary)
+library(ggstats)
+library(khroma)
+library(scales)
+
+# affichage gtsummary en français
+theme_gtsummary_language("fr", decimal.mark = ",")
+
+# import des données
+d <- read_excel("resultats_export_limesurvey.xlsx")
+
+# ordre des modalités
+d <- d |> 
+  mutate(
+    naissance = naissance |> 
+      fct_relevel("France", "Afrique", "autre"),
+    pays = pays |> 
+      fct_relevel("France", "Afrique", "autre"),
+    situation = situation |> 
+      fct_relevel(
+        "étudiant en M1 (master première année)",
+        "étudiant en M2 (master deuxième année)",
+        "doctorant",
+        "post-doctorant",
+        "ingénieur d'études",
+        "ingénieur de recherche",
+        "enseignant-chercheur (MCF ou professeur)",
+        "chercheur (CR ou DR)",
+        "autre"
+      ),
+    discipline = discipline |> 
+      fct_infreq() |> 
+      fct_relevel("autre", after = Inf),
+    across(
+      `seances[w01]`:`seances[w16]`,
+      \(x) x |> 
+        fct_relevel(
+          "suivi en live (direct)",
+          "regardé en différé (replay)",
+          "non suivi"
+        )
+    ),
+    across(
+      `fonctionnalites[SQ001]`:`fonctionnalites[SQ014]`,
+      \(x) x |> 
+        factor(
+          levels = 1:5,
+          labels = c(
+            "pas du tout utile / prioritaire",
+            "inutile / non prioritaire",
+            "ni l'un ni l'autre",
+            "utile / prioritaire",
+            "essentielle / très prioritaire"
+          )
+        )
+    )
+  )
+
+# étiquettes des variables
+d <- d |> 
+  set_variable_labels(
+    groupe_ages = "Groupe d'âges",
+    genre = "Genre",
+    naissance = "Lieu de naissance",
+    pays = "Lieu de résidence",
+    situation = "Statut académique",
+    discipline = "Discipline",
+    analyseR = "Connaissance / Utilisation du site analyse-R",
+    `seances[w01]` = "26/11/2020 - Premier contact avec R et RStudio",
+    `seances[w02]` = "3/12/2020 - Les bases du langage R",
+    `seances[w03]` = "10/12/2020 - Stat. descriptives (gtsummary, esquisse)",
+    `seances[faq1]` = "17/12/2020 - Session Foire aux questions",
+    `seances[w04]` = "14/01/2021 - Manipuler les données avec dplyr",
+    `seances[w05]` = "21/01/2021 - Recoder des variables",
+    `seances[w06]` = "28/01/2021 - Régression logistique (partie 1)",
+    `seances[w07]` = "4/02/2021 - Régression logistique (partie 2)",
+    `seances[faq2]` = "11/02/2021 - Session Foire aux questions",
+    `seances[w08]` = "18/02/2021 - ggplot2, la grammaire des graphiques",
+    `seances[w09]` = "25/02/2021 - Graphiques uni- et bivariés",
+    `seances[w10]` = "4/03/2021 - Plan d'échantillonnage & survey",
+    `seances[w11]` = "11/03/2021 - Analyses des Correspondances Multiples",
+    `seances[w12]` = "18/03/2021 - Classification Ascendante Hiérarchique",
+    `seances[faq3]` = "25/03/2021 - Session Foire aux questions (FAQ)",
+    `seances[w13]` = "1/04/2021 - Exemples de graphiques avancés",
+    `seances[w14]` = "8/04/2021 - Exemples de graphiques avancés (2)",
+    `seances[w15]` = "29/04/2021 - Analyse de survie",
+    `seances[w16]` = "6/05/2021 - Analyse de séquences",
+    `fonctionnalites[SQ001]` = "Diffusion des vidéos en direct (live)",
+    `fonctionnalites[SQ002]` = "Visionnage des vidéos en différé (replay)",
+    `fonctionnalites[SQ003]` = "Chapitrage des vidéos (vidéos découpées en chapitres)",
+    `fonctionnalites[SQ004]` = "Scripts R des vidéos en téléchargement sur le site webin-R",
+    `fonctionnalites[SQ005]` = "Liste des chapitres analyse-R correspondant à chaque vidéo",
+    `fonctionnalites[SQ006]` = "Site web dédié des webin-R avec ressources associées",
+    `fonctionnalites[SQ007]` = "Commentaires / Questions / Chat pendant le live",
+    `fonctionnalites[SQ008]` = "Commentaires / Questions sur YouTube",
+    `fonctionnalites[SQ009]` = "Commentaires / Questions sur les pages des sites analyse-R / webin-R",
+    `fonctionnalites[SQ010]` = "Abonnement à la chaine YouTube",
+    `fonctionnalites[SQ011]` = "Playlist YouTube des webin-R",
+    `fonctionnalites[SQ012]` = "Accès aux vidéos sans inscription",
+    `fonctionnalites[SQ013]` = "Les sessions FAQ (foire aux questions)",
+    `fonctionnalites[SQ014]` = "Partage d'écran pendant les vidéos"
+  )
+
+
+```
+
+## Profil des participant·es
+
+```{r}
+d |> 
+  tbl_summary(
+    include = c(groupe_ages:discipline, analyseR),
+    statistic = all_categorical() ~ "{p}% ({n})",
+    digits = all_categorical() ~ list(p = 1, n = 0)
+  ) |> 
+  bold_labels() |> 
+  modify_footnote(all_stat_cols() ~ NA)
+```
+
+## Suivi des webin-R
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+
+# transformation du format
+# une ligne par séance et par observation
+seances <- d |> 
+  select(`seances[w01]`:`seances[w16]`)
+
+suivi <- seances |> 
+  pivot_longer(
+    everything(),
+    names_to = "code_seance",
+    values_to = "suivi"
+  )
+
+# réorganisation de la variable séance
+# création d'un facteur
+# ordonné selon ordre des séances
+# et remplacement par les étiquettes de variables
+
+suivi$seance <- suivi$code_seance |> 
+  factor(
+    levels = names(seances),
+    labels = var_label(seances, unlist = TRUE)
+  )
+
+suivi |> 
+  mutate(
+    seance = fct_rev(seance),
+    suivi = fct_rev(suivi)
+  ) |> 
+  ggplot() +
+  aes(
+    y = seance,
+    fill = suivi
+  ) +
+  geom_bar(position = "fill", width = .8) +
+  geom_text(
+    aes(
+      label = after_stat(prop) |> percent(accuracy = 1),
+      by = seance
+    ),
+    stat = "prop",
+    position = position_fill(.5),
+    color = "white",
+    size = 3
+  ) +
+  labs(x = NULL, y = NULL, fill = NULL) +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_fill_manual(
+    values = c("#AA3377", "#4477AA", "#44AA99")
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    panel.grid = element_blank(),
+    axis.text.x = element_blank()
+  )
+```
+
+## Fonctionnalités les plus importantes
+
+```{r}
+#| fig-width: 10
+#| fig-height: 6
+d |> 
+  gglikert(
+    include = `fonctionnalites[SQ001]`:`fonctionnalites[SQ014]`,
+    sort = "descending",
+    sort_method = "median",
+    y_label_wrap = 100,
+    labels_size = 3
+  ) +
+  guides(
+    fill = guide_legend(nrow = 2, byrow = TRUE)
+  )
+```
+
