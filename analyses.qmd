@@ -230,3 +230,28 @@ d |>
   )
 ```
 
+## Importance des sessions FAQ selon le pays de résidence
+
+```{r}
+#| fig-width: 10
+#| fig-height: 3
+
+d <- d |> 
+  mutate(
+    pays2 = pays |> 
+      fct_recode(
+        "étranger" = "Afrique",
+        "étranger" = "autre"
+      )
+  )
+
+d |> 
+  gglikert(
+    include = `fonctionnalites[SQ013]`,
+    y = "pays2"
+  ) +
+  guides(
+    fill = guide_legend(nrow = 2, byrow = TRUE)
+  )
+```
+
